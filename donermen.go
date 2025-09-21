@@ -12,10 +12,10 @@ type DonerMan struct {
 }
 
 type donerMen struct {
-	Donermen []DonerMan
+	Donermen []*DonerMan
 }
 
-func GetDonerMen() ([]DonerMan, error) {
+func GetDonerMen() ([]*DonerMan, error) {
 	f, err := os.ReadFile("./donermen.json")
 	if err != nil {
 		return nil, err

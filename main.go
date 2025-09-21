@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -20,13 +18,16 @@ var (
 	BotToken     = flag.String("token", "", "Bot access token")
 	AppID        = flag.String("app", "", "Application ID")
 	DonerChannel = flag.String("chan", "", "The channel ID of the order process")
-	PollDuration = flag.Duration("pd", 15*time.Second, "Poll duration")
+
+	PollDuration  = flag.Duration("pd", 15*time.Second, "Poll duration")
+	OrderDuration = flag.Duration("od", 15*time.Second, "Order duration")
 )
 
-var s discordgo.Session
+// TODO: order summary in dm
+// TODO: pay in cache and/or paypal
 
 func main() {
-	dm, err := GetDonerMen()
+	dms, err := GetDonerMen()
 	if err != nil {
 		log.Fatalln("Could not read donermen: " + err.Error())
 	}
@@ -46,20 +47,12 @@ func main() {
 	// 	}
 	// })
 
-	pollMsg, pollTimer := startDonerMenPoll(s, dm)
-
 	if err = s.Open(); err != nil {
 		log.Fatalln("Error: " + err.Error())
 	}
 	defer s.Close()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
-	select {
-	case <-pollTimer.C:
-		log.Println("Poll finished.")
-		startOrder(s, pollMsg, dm)
-	case <-stop:
-		log.Println("Shutdown")
-	}
+	dm, voters := startDonerMenPoll(s, dms)
+	startOrder(s, dm, voters)
+
 }
