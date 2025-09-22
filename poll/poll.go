@@ -50,37 +50,6 @@ func StartDonerMenPoll(s *discordgo.Session, dms []*doner.DonerMan) (*doner.Done
 	return winner, users
 }
 
-func announcePollWinner(s *discordgo.Session, dm *doner.DonerMan) {
-	var content = fmt.Sprintf(
-		`# :rotating_light::rotating_light: Bestellwunschaufnahme!!! :rotating_light::rotating_light:
-## Gewinner ist %s %s !!!!
-<@&%s> <@&%s>
-
-Weiteres wird per DM geklärt :saluting_face:!`,
-		dm.Name,
-		dm.Emoji,
-		args.DonerRoles[0],
-		args.DonerRoles[1],
-	)
-	_, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
-		Content: content,
-		Components: []discordgo.MessageComponent{discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					Label: "Menu",
-					Style: discordgo.LinkButton,
-					URL:   dm.MenuURL,
-					Emoji: &discordgo.ComponentEmoji{Name: "🏴‍☠️"},
-				},
-			},
-		}},
-	})
-
-	if err != nil {
-		log.Fatalln("Error while sending winner announcement: " + err.Error())
-	}
-}
-
 func getPollVoters(s *discordgo.Session, pollMsg *discordgo.Message) []*discordgo.User {
 	users := []*discordgo.User{}
 	for _, result := range pollMsg.Poll.Results.AnswerCounts {
@@ -94,22 +63,6 @@ func getPollVoters(s *discordgo.Session, pollMsg *discordgo.Message) []*discordg
 		}
 	}
 	return users
-}
-
-func sendInvalidVoteMessage(s *discordgo.Session) {
-	_, err := s.ChannelMessageSendComplex(
-		*args.DonerChannel,
-		&discordgo.MessageSend{
-			Content: fmt.Sprintf("Niemand hat gevoted. Heute gibt es wohl kein %s D<@&:%s><@&:%s>",
-				doner.GetRandomDonerName(), args.DonerRoles[0], args.DonerRoles[1],
-			),
-			AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles},
-		},
-	)
-	if err != nil {
-		log.Fatalln("Could not send invalid vote message: " + err.Error())
-	}
-	os.Exit(1)
 }
 
 func getPollWinner(s *discordgo.Session, pollMsg *discordgo.Message, donerMen []*doner.DonerMan) *doner.DonerMan {
