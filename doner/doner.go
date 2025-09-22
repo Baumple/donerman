@@ -1,4 +1,4 @@
-package main
+package doner
 
 import "math/rand/v2"
 
@@ -10,7 +10,7 @@ var (
 		"Osmanische Rohrbombe",
 		"Türkischer Drehspieß-Propeller",
 		"Kreuzritterabwehr-Gulaschwalze",
-		"Kreuzritterabwehr-Nährstoffbombe",
+		"Kreuzritterabwehr-Kalifats-Kalorienrakete (KKK)",
 		"Baba's Bauchrakete",
 		"Sesamsoßen-Sprengsatz",
 		"Anatolischer Protein-Torpedo",
@@ -18,10 +18,11 @@ var (
 		"Fleischfladen-Frachtgeschoss",
 		"Knoblauchsaußen-Kavallerie",
 		"Lamacun-Lebergranate",
-		"Des Kreuzritter's Albtraum",
 		"Heiliger Gral der Hackfleischhydraulik",
 		"Fleischkelch des Bosporus",
-		"Knoblauchtes Darmverschluss Edelgeschoss",
+		"Knoblauchtes Darmverschluss 50mm-Edelgeschoss",
+		"Treibspiegelknoblauchgranate",
+		"sechste des Säule des Islams",
 	}
 )
 

@@ -1,4 +1,4 @@
-package main
+package poll
 
 import (
 	"fmt"
@@ -6,25 +6,26 @@ import (
 	"os"
 	"time"
 
+	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/doner"
+
 	"github.com/bwmarrin/discordgo"
 )
 
-var (
-	DonerRoles = []string{"1371736220748611636", "1417481551830188145"}
-)
-
-func startDonerMenPoll(s *discordgo.Session, dms []*DonerMan) (*DonerMan, []*discordgo.User) {
+func StartDonerMenPoll(s *discordgo.Session, dms []*doner.DonerMan) (*doner.DonerMan, []*discordgo.User) {
 	log.Println("Starting poll.")
 
 	answers := buildVoteAnswers(dms)
-	pollMsg, err := s.ChannelMessageSendComplex(*DonerChannel, &discordgo.MessageSend{
+	pollMsg, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
 		Content: fmt.Sprintf(`# 🚨🚨 Welcher Dönermann wird heute beansprucht. 🚨🚨
 ## Jetzt wird freiheitlich **DEMOKRATISCH** gewählt!!!
-<@&%s> <@&%s>`, DonerRoles[0], DonerRoles[1]),
-		AllowedMentions: &discordgo.MessageAllowedMentions{Roles: DonerRoles},
+<@&%s> <@&%s>`, args.DonerRoles[0], args.DonerRoles[1]),
+		AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles},
 		Poll: &discordgo.Poll{
 			Question: discordgo.PollMedia{
-				Text: fmt.Sprintf("Wähle deinen %s-Fabrikanten des Vertrauens!!!", GetRandomDonerName()),
+				Text: fmt.Sprintf("Wähle deinen %s-Fabrikanten des Vertrauens!!!",
+					doner.GetRandomDonerName(),
+				),
 			},
 			Answers:          answers,
 			AllowMultiselect: false,
@@ -36,7 +37,7 @@ func startDonerMenPoll(s *discordgo.Session, dms []*DonerMan) (*DonerMan, []*dis
 		log.Fatalln("Could not send poll: " + err.Error())
 	}
 
-	pollTimer := time.NewTimer(*PollDuration)
+	pollTimer := time.NewTimer(*args.PollDuration)
 	<-pollTimer.C
 
 	log.Println("Poll finished.")
@@ -49,7 +50,7 @@ func startDonerMenPoll(s *discordgo.Session, dms []*DonerMan) (*DonerMan, []*dis
 	return winner, users
 }
 
-func announcePollWinner(s *discordgo.Session, dm *DonerMan) {
+func announcePollWinner(s *discordgo.Session, dm *doner.DonerMan) {
 	var content = fmt.Sprintf(
 		`# :rotating_light::rotating_light: Bestellwunschaufnahme!!! :rotating_light::rotating_light:
 ## Gewinner ist %s %s !!!!
@@ -58,10 +59,10 @@ func announcePollWinner(s *discordgo.Session, dm *DonerMan) {
 Weiteres wird per DM geklärt :saluting_face:!`,
 		dm.Name,
 		dm.Emoji,
-		DonerRoles[0],
-		DonerRoles[1],
+		args.DonerRoles[0],
+		args.DonerRoles[1],
 	)
-	_, err := s.ChannelMessageSendComplex(*DonerChannel, &discordgo.MessageSend{
+	_, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
 		Content: content,
 		Components: []discordgo.MessageComponent{discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
@@ -97,12 +98,12 @@ func getPollVoters(s *discordgo.Session, pollMsg *discordgo.Message) []*discordg
 
 func sendInvalidVoteMessage(s *discordgo.Session) {
 	_, err := s.ChannelMessageSendComplex(
-		*DonerChannel,
+		*args.DonerChannel,
 		&discordgo.MessageSend{
 			Content: fmt.Sprintf("Niemand hat gevoted. Heute gibt es wohl kein %s D<@&:%s><@&:%s>",
-				GetRandomDonerName(), DonerRoles[0], DonerRoles[1],
+				doner.GetRandomDonerName(), args.DonerRoles[0], args.DonerRoles[1],
 			),
-			AllowedMentions: &discordgo.MessageAllowedMentions{Roles: DonerRoles},
+			AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles},
 		},
 	)
 	if err != nil {
@@ -111,7 +112,7 @@ func sendInvalidVoteMessage(s *discordgo.Session) {
 	os.Exit(1)
 }
 
-func getPollWinner(s *discordgo.Session, pollMsg *discordgo.Message, donerMen []*DonerMan) *DonerMan {
+func getPollWinner(s *discordgo.Session, pollMsg *discordgo.Message, donerMen []*doner.DonerMan) *doner.DonerMan {
 	answers := pollMsg.Poll.Answers
 	results := pollMsg.Poll.Results
 	if len(donerMen) <= 0 {
@@ -143,7 +144,7 @@ func getPollWinner(s *discordgo.Session, pollMsg *discordgo.Message, donerMen []
 	panic("This should be unreachable")
 }
 
-func buildVoteAnswers(dms []*DonerMan) []discordgo.PollAnswer {
+func buildVoteAnswers(dms []*doner.DonerMan) []discordgo.PollAnswer {
 	answers := []discordgo.PollAnswer{}
 	for _, donerMan := range dms {
 		media := discordgo.PollMedia{

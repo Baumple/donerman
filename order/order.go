@@ -1,4 +1,4 @@
-package main
+package order
 
 import (
 	"fmt"
@@ -6,13 +6,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/doner"
 	"github.com/bwmarrin/discordgo"
-	"golang.org/x/text/currency"
 )
 
 type Order struct {
 	ItemName string
-	Price    currency.Amount
+	Price    float64
 	PlacedBy *discordgo.User
 }
 
@@ -42,58 +43,59 @@ func (o *orderState) isValid() bool {
 	return o.itemName != nil && o.itemPrice != nil
 }
 
-func startOrder(s *discordgo.Session, dm *DonerMan, voters []*discordgo.User) map[*discordgo.User][]Order {
+func StartOrder(s *discordgo.Session, dm *doner.DonerMan, voters []*discordgo.User) map[*discordgo.User][]Order {
 	log.Println("Starting order.")
 	orders := getOrdersFromUsers(s, dm, voters)
 	sendOrderSummary(s, orders)
 	return orders
 }
 
-func sendOrderSummary(s *discordgo.Session, orders map[*discordgo.User][]Order) {
-	userOrderContainers := []discordgo.MessageComponent{}
+func sendOrderSummary(s *discordgo.Session, userOrdersMap map[*discordgo.User][]Order) {
+	orderSummaryEmbeds := []*discordgo.MessageEmbed{}
+	userIds := []string{}
 
-	for user, _ := range orders {
-		orderComp := []discordgo.MessageComponent{
-			discordgo.TextDisplay{Content: fmt.Sprintf("%s:", user.Mention())},
-			// discordgo.Separator{},
+	for user, orders := range userOrdersMap {
+		totalOrderValue := 0.0
+		title := user.Username + " hat bestellt:"
+
+		fields := []*discordgo.MessageEmbedField{}
+
+		for _, order := range orders {
+			embedField := discordgo.MessageEmbedField{
+				Name:  order.ItemName,
+				Value: fmt.Sprintf("%.02f€", order.Price),
+			}
+			fields = append(fields, &embedField)
+
+			totalOrderValue += order.Price
 		}
 
-		orderComp = append(orderComp, userOrderContainers...)
-		//
-		// for _, order := range orders {
-		// 	comp := discordgo.TextDisplay{Content: fmt.Sprintf("'%s' für %.02f€", order.ItemName, order.Price)}
-		// 	oderComp = append(oderComp, comp)
-		// }
-		// comp := discordgo.Container{Components: oderComp}
-		//
-		userOrderContainers = append(userOrderContainers, orderComp...)
-		// userOrderContainers = append(userOrderContainers, discordgo.Separator{})
+		embed := discordgo.MessageEmbed{
+			Type:   discordgo.EmbedTypeRich,
+			Title:  title,
+			Fields: fields,
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: fmt.Sprintf("Gesamt: %.02f€", totalOrderValue),
+			},
+			Color: 15418782,
+		}
+		orderSummaryEmbeds = append(orderSummaryEmbeds, &embed)
+		userIds = append(userIds, user.ID)
 	}
 
-	_, err := s.ChannelMessageSendComplex(*DonerChannel, &discordgo.MessageSend{
-		Content: "" +
-			"",
-		Embeds: []*discordgo.MessageEmbed{
-			{
-				Type:        discordgo.EmbedTypeArticle,
-				Title:       "Die Bestellungen sind nun da!",
-				Description: "# **Keine weiteren werden angenommen!!!**",
-				Fields: []*discordgo.MessageEmbedField{
-					{
-						Name:   "Test",
-						Value:  "test",
-						Inline: true,
-					},
-				},
-			},
-		},
+	_, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
+		Content:         "# :rotating_light: Die Bestellungen sind nun da! :rotating_light:",
+		Embeds:          orderSummaryEmbeds,
+		AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles, Users: userIds},
 	})
+
 	if err != nil {
 		log.Fatalln("Could not send order summary: " + err.Error())
 	}
+
 }
 
-func sendOrderMessage(s *discordgo.Session, dm *DonerMan, o *orderState, expiry time.Time) error {
+func sendOrderMessage(s *discordgo.Session, dm *doner.DonerMan, o *orderState, expiry time.Time) error {
 	hour, minutes, _ := expiry.Clock()
 	var msg = fmt.Sprintf(
 		"Es wird heute bei %s%s bestellt."+
@@ -153,20 +155,20 @@ func initOrderChannels(
 // TODO: Find another way instead of pointer to orders map
 func getOrdersFromUsers(
 	s *discordgo.Session,
-	dm *DonerMan,
+	dm *doner.DonerMan,
 	voters []*discordgo.User,
 ) map[*discordgo.User][]Order {
 	userOrderStateMap := initOrderChannels(s, voters)
 
 	orderChan := make(chan (Order), 16)
-	s.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+	removeHandler := s.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if state, ok := userOrderStateMap[m.Author.ID]; ok {
 			handleOrderMessage(s, m, state, orderChan)
 		}
 	})
 
-	expiry := time.Now().Add(*OrderDuration)
-	timer := time.NewTimer(*OrderDuration)
+	expiry := time.Now().Add(*args.OrderDuration)
+	timer := time.NewTimer(*args.OrderDuration)
 
 	for _, o := range userOrderStateMap {
 		err := sendOrderMessage(s, dm, o, expiry)
@@ -183,6 +185,7 @@ func getOrdersFromUsers(
 
 		case <-timer.C:
 			log.Println("Finished order.")
+			removeHandler()
 			return orders
 		}
 	}
@@ -210,7 +213,7 @@ func handleOrderMessage(
 				state.user.Username, err.Error(),
 			)
 		}
-		fmt.Println("wtf")
+
 		state.stage = itemPriceStage
 		log.Printf("Received item name from %s: %s", state.user.Username, *state.itemName)
 
@@ -237,7 +240,7 @@ func handleOrderMessage(
 
 			orderChan <- Order{
 				ItemName: *state.itemName,
-				Price:    currency.EUR.Amount(*state.itemPrice),
+				Price:    *state.itemPrice,
 				PlacedBy: state.user,
 			}
 
