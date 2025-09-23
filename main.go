@@ -13,6 +13,10 @@ import (
 
 // TODO: order summary in dm
 // TODO: pay in cache and/or paypal
+// TODO: Special offers
+// TODO: pickup or delivery
+// TODO: more detailed output
+//       - log expected poll/order time end
 
 func main() {
 	dms, err := doner.GetDonerMen()

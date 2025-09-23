@@ -3,7 +3,6 @@ package poll
 import (
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/baumple/donerman/args"
@@ -30,7 +29,7 @@ func StartDonerMenPoll(s *discordgo.Session, dms []*doner.DonerMan) (*doner.Done
 			Answers:          answers,
 			AllowMultiselect: false,
 			LayoutType:       1,
-			Duration:         1,
+			Duration:         int(args.PollDuration.Hours()) + 1,
 		},
 	})
 	if err != nil {

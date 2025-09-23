@@ -4,6 +4,16 @@
             "name" : "Captain Kebap",
             "menu_url" : "https://captain-kebap-fulda.de/",
             "emoji" : "🏴‍☠"
+        },
+        {
+            "name" : "City-Döner",
+            "menu_url" : "https://city-doener-fulda.de/",
+            "emoji" : "🏙️"
+        },
+        {
+            "name" : "Hodenberg",
+            "menu_url" : "https://www.lieferando.de/en/menu/rosenberg-rabanus-maurus-strasse-petersberg",
+            "emoji" : "🌹"
         }
     ]
 }

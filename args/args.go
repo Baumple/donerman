@@ -16,11 +16,10 @@ var (
 	AppID        = flag.String("app", "", "Application ID")
 	DonerChannel = flag.String("chan", "", "The channel ID of the order process")
 
-	PollDuration  = flag.Duration("pd", 15*time.Second, "Poll duration")
-	OrderDuration = flag.Duration("od", 15*time.Second, "Order duration")
+	PollDuration  = flag.Duration("pd", 2*time.Hour, "Poll duration")
+	OrderDuration = flag.Duration("od", 1*time.Hour+50*time.Minute, "Order duration")
 )
 
 var (
 	DonerRoles = []string{"1371736220748611636", "1417481551830188145"}
 )
-
