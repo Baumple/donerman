@@ -3,20 +3,20 @@ package main
 import (
 	"log"
 
-	"github.com/baumple/donerman/doner"
-	"github.com/baumple/donerman/poll"
-	"github.com/baumple/donerman/order"
 	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/doner"
+	"github.com/baumple/donerman/order"
+	"github.com/baumple/donerman/poll"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 // TODO: order summary in dm
-// TODO: pay in cache and/or paypal
 // TODO: Special offers
 // TODO: pickup or delivery
 // TODO: more detailed output
 //       - log expected poll/order time end
+// TODO: config for announcements
 
 func main() {
 	dms, err := doner.GetDonerMen()

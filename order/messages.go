@@ -3,31 +3,40 @@ package order
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/baumple/donerman/args"
-	"github.com/baumple/donerman/doner"
 	"github.com/bwmarrin/discordgo"
 )
 
-func sendOrderSummary(s *discordgo.Session, userOrdersMap map[*discordgo.User][]Order) {
+// TODO: Final embed for total price
+func sendOrderSummary(
+	s *discordgo.Session,
+	userOrdersMap map[string][]Order,
+	users map[string]*discordgo.User,
+) {
 	orderSummaryEmbeds := []*discordgo.MessageEmbed{}
 	userIds := []string{}
 
-	for user, orders := range userOrdersMap {
+	for userID, orders := range userOrdersMap {
 		totalOrderValue := 0.0
+		user := users[userID]
+
 		title := user.Username + " hat bestellt:"
 
 		fields := []*discordgo.MessageEmbedField{}
-
 		for _, order := range orders {
 			embedField := discordgo.MessageEmbedField{
-				Name:  order.ItemName,
-				Value: fmt.Sprintf("%.02f€", order.Price),
+				Name: fmt.Sprintf("%d x %s", order.Amount, order.ItemName),
+				Value: fmt.Sprintf("%d x %.02f€ = %0.2f (%s)",
+					order.Amount,
+					order.PricePerPiece,
+					order.TotalPrice(),
+					order.PaymentMethod.String(),
+				),
 			}
 			fields = append(fields, &embedField)
 
-			totalOrderValue += order.Price
+			totalOrderValue += order.TotalPrice()
 		}
 
 		embed := discordgo.MessageEmbed{
@@ -53,30 +62,4 @@ func sendOrderSummary(s *discordgo.Session, userOrdersMap map[*discordgo.User][]
 		log.Fatalln("Could not send order summary: " + err.Error())
 	}
 
-}
-
-func sendOrderMessage(s *discordgo.Session, dm *doner.DonerMan, o *orderState, expiry time.Time) error {
-	hour, minutes, _ := expiry.Clock()
-	var msg = fmt.Sprintf(
-		"Es wird heute bei %s%s bestellt."+
-			"\nDrop mal bitte was du bestellen willst (Einfach der Name von dem Ding)"+
-			"\nDu hast bis %d:%02d Zeit",
-		dm.Name, dm.Emoji, hour, minutes,
-	)
-	_, err := s.ChannelMessageSendComplex(o.userChannel.ID, &discordgo.MessageSend{
-		Content: msg,
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					discordgo.Button{
-						Label: "Menü",
-						Style: discordgo.LinkButton,
-						Emoji: &discordgo.ComponentEmoji{Name: "📜"},
-						URL:   dm.MenuURL,
-					},
-				},
-			},
-		},
-	})
-	return err
 }
