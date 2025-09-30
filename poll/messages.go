@@ -6,19 +6,21 @@ import (
 	"os"
 	"time"
 
-	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/config"
 	"github.com/baumple/donerman/doner"
 	"github.com/bwmarrin/discordgo"
 )
 
 func sendInvalidVoteMessage(s *discordgo.Session) {
 	_, err := s.ChannelMessageSendComplex(
-		*args.DonerChannel,
+		*config.DonerChannel,
 		&discordgo.MessageSend{
-			Content: fmt.Sprintf("Niemand hat gevoted. Heute gibt es wohl kein %s D<@&:%s><@&:%s>",
-				doner.GetRandomDonerName(), args.DonerRoles[0], args.DonerRoles[1],
+			Content: fmt.Sprintf("Niemand hat gevoted. Heute gibt es wohl kein %s D<@&:%s>",
+				doner.GetRandomDonerName(), config.DonerManRole,
 			),
-			AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles},
+			AllowedMentions: &discordgo.MessageAllowedMentions{
+				Roles: []string{config.DonerManRole},
+			},
 		},
 	)
 	if err != nil {
@@ -39,10 +41,10 @@ Weiteres wird per slash-command geklärt ("/order") :saluting_face:!
 Danach wird **nichts** mehr angenommen.`,
 		dm.Name,
 		dm.Emoji,
-		args.DonerRoles[1],
+		config.DonerManRole,
 		expiry.Format("15:04"),
 	)
-	_, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
+	_, err := s.ChannelMessageSendComplex(*config.DonerChannel, &discordgo.MessageSend{
 		Content: content,
 		Components: []discordgo.MessageComponent{discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
@@ -62,13 +64,15 @@ Danach wird **nichts** mehr angenommen.`,
 }
 
 func sendPollMessage(s *discordgo.Session, dms []*doner.DonerMan) *discordgo.Message {
-	endTime := time.Now().Add(*args.PollDuration).Format("15:04")
+	endTime := time.Now().Add(*config.PollDuration).Format("15:04")
 	answers := buildVoteAnswers(dms)
-	pollMsg, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
+	pollMsg, err := s.ChannelMessageSendComplex(*config.DonerChannel, &discordgo.MessageSend{
 		Content: fmt.Sprintf(`# 🚨🚨 Welcher Dönermann wird heute beansprucht. 🚨🚨
 ## Jetzt wird freiheitlich **DEMOKRATISCH** gewählt!!! (Ende %s Uhr)
-<@&%s> <@&%s>`, endTime, args.DonerRoles[0], args.DonerRoles[1]),
-		AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles},
+<@&%s>`, endTime, config.DonerManRole),
+		AllowedMentions: &discordgo.MessageAllowedMentions{
+			Roles: []string{/* config.DonerManRole */},
+		},
 		Poll: &discordgo.Poll{
 			Question: discordgo.PollMedia{
 				Text: fmt.Sprintf("Wähle deinen %s-Fabrikanten des Vertrauens!!!",
@@ -77,7 +81,7 @@ func sendPollMessage(s *discordgo.Session, dms []*doner.DonerMan) *discordgo.Mes
 			},
 			Answers:    answers,
 			LayoutType: discordgo.PollLayoutTypeDefault,
-			Duration:   int(args.PollDuration.Hours()) + 1,
+			Duration:   int(config.PollDuration.Hours()) + 1,
 		},
 	})
 	if err != nil {

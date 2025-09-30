@@ -4,8 +4,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/config"
 	"github.com/baumple/donerman/doner"
+	"github.com/baumple/donerman/utils"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -38,7 +39,6 @@ var (
 )
 
 // Returns a function which deletes both the handler and the commands
-// TODO: confirmation messages
 func createCommands(s *discordgo.Session, pollTimer *time.Timer) func() {
 	removeHandler := s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		optMap := make(
@@ -51,8 +51,17 @@ func createCommands(s *discordgo.Session, pollTimer *time.Timer) func() {
 
 		switch i.ApplicationCommandData().Name {
 		case "advance-poll":
-			pollTimer.Reset(0)
+			if utils.IsOberdirektor(i.Member) {
+				pollTimer.Reset(0)
+				utils.SendConfirmation(s, i)
+			} else {
+				utils.SendNotAllowed(s, i)
+			}
 		case "set-poll-time":
+			if !utils.IsOberdirektor(i.Member) {
+				utils.SendNotAllowed(s, i)
+				return
+			}
 			var minutes time.Duration
 			if m, ok := optMap["minutes"]; ok {
 				minutes = time.Duration(m.IntValue())
@@ -62,7 +71,24 @@ func createCommands(s *discordgo.Session, pollTimer *time.Timer) func() {
 				seconds = time.Duration(s.IntValue())
 			}
 
-			pollTimer.Reset(time.Duration(minutes)*time.Minute + time.Duration(seconds)*time.Second)
+			duration := time.Duration(minutes)*time.Minute +
+				time.Duration(seconds)*time.Second
+			timeEnd := time.Now().Add(duration)
+
+			pollTimer.Reset(duration)
+
+			log.Println("Poll now ends: " + duration.String())
+
+			err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Votum endet nun um: " + timeEnd.Format("15:04"),
+				},
+			})
+			if err != nil {
+				log.Println("Could not send confirmation message" + err.Error())
+			}
+
 		}
 	})
 
@@ -70,7 +96,7 @@ func createCommands(s *discordgo.Session, pollTimer *time.Timer) func() {
 
 	cmds := []*discordgo.ApplicationCommand{}
 	for _, cmd := range commands {
-		cmd, err := s.ApplicationCommandCreate(*args.AppID, *args.GuildID, cmd)
+		cmd, err := s.ApplicationCommandCreate(*config.AppID, *config.GuildID, cmd)
 		if err != nil {
 			log.Fatalln("Could not create poll commands:" + err.Error())
 		}
@@ -80,7 +106,7 @@ func createCommands(s *discordgo.Session, pollTimer *time.Timer) func() {
 	return func() {
 		log.Println("Deleting commands")
 		for _, cmd := range cmds {
-			err := s.ApplicationCommandDelete(*args.AppID, *args.GuildID, cmd.ID)
+			err := s.ApplicationCommandDelete(*config.AppID, *config.GuildID, cmd.ID)
 			if err != nil {
 				log.Println("Could not delete poll commands: " + err.Error())
 			}
@@ -94,7 +120,7 @@ func StartDonerMenPoll(s *discordgo.Session, dms []*doner.DonerMan) (*doner.Done
 
 	pollMsg := sendPollMessage(s, dms)
 
-	pollTimer := time.NewTimer(*args.PollDuration)
+	pollTimer := time.NewTimer(*config.PollDuration)
 
 	deleteCommands := createCommands(s, pollTimer)
 	defer deleteCommands()
@@ -108,7 +134,7 @@ func StartDonerMenPoll(s *discordgo.Session, dms []*doner.DonerMan) (*doner.Done
 	winner := getPollWinner(s, pollMsg, dms)
 	users := getPollVoters(s, pollMsg)
 
-	expiry := time.Now().Add(*args.OrderDuration).Local()
+	expiry := time.Now().Add(*config.OrderDuration).Local()
 	announcePollWinner(s, winner, expiry)
 	return winner, users
 }

@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/config"
 	"github.com/bwmarrin/discordgo"
 )
 
-// TODO: Final embed for total price
 func sendOrderSummary(
 	s *discordgo.Session,
 	userOrdersMap map[string][]Order,
@@ -52,10 +51,13 @@ func sendOrderSummary(
 		userIds = append(userIds, user.ID)
 	}
 
-	_, err := s.ChannelMessageSendComplex(*args.DonerChannel, &discordgo.MessageSend{
-		Content:         "# :rotating_light: Die Bestellungen sind nun da! :rotating_light:",
-		Embeds:          orderSummaryEmbeds,
-		AllowedMentions: &discordgo.MessageAllowedMentions{Roles: args.DonerRoles, Users: userIds},
+	_, err := s.ChannelMessageSendComplex(*config.DonerChannel, &discordgo.MessageSend{
+		Content: "# :rotating_light: Die Bestellungen sind nun da! :rotating_light:",
+		Embeds:  orderSummaryEmbeds,
+		AllowedMentions: &discordgo.MessageAllowedMentions{
+			Roles: []string{config.DonerManRole},
+			Users: userIds,
+		},
 	})
 
 	if err != nil {

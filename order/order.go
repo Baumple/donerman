@@ -1,11 +1,15 @@
 package order
 
 import (
+	"fmt"
 	"log"
+	"sync"
 	"time"
 
-	"github.com/baumple/donerman/args"
+	"github.com/baumple/donerman/config"
 	"github.com/baumple/donerman/doner"
+	"github.com/baumple/donerman/utils"
+
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -13,6 +17,7 @@ type Order struct {
 	ItemName      string
 	PricePerPiece float64
 	Amount        int
+	Comment       string
 	PlacedBy      *discordgo.User
 	PaymentMethod PaymentMethod
 }
@@ -23,20 +28,23 @@ func (o *Order) TotalPrice() float64 {
 
 type PaymentMethod int
 
+const (
+	paymentPaypal = PaymentMethod(iota)
+	paymentCash
+	paymentDebt
+)
+
 func (p PaymentMethod) String() string {
 	if p == paymentCash {
 		return "Paypal"
 	} else if p == paymentPaypal {
 		return "Cash"
+	} else if p == paymentDebt {
+		return "Debt"
 	}
 	log.Fatalf("Received illegal payment method: %d", p)
 	panic(nil)
 }
-
-const (
-	paymentPaypal = PaymentMethod(iota)
-	paymentCash
-)
 
 var (
 	minPrice  = 0.01
@@ -62,7 +70,7 @@ var (
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionInteger,
-					Name:        "cash-or-paypal",
+					Name:        "payment-method",
 					Description: "Bar oder mit Karte (paypal)",
 					Required:    true,
 					Choices: []*discordgo.ApplicationCommandOptionChoice{
@@ -73,6 +81,10 @@ var (
 						{
 							Name:  "paypal",
 							Value: paymentPaypal,
+						},
+						{
+							Name:  "debt",
+							Value: paymentDebt,
 						},
 					},
 				},
@@ -112,7 +124,7 @@ var (
 
 func StartOrder(s *discordgo.Session, dm *doner.DonerMan, voters []*discordgo.User) map[string][]Order {
 	log.Println("Starting order.")
-	expiry := time.Now().Local().Add(*args.OrderDuration)
+	expiry := time.Now().Local().Add(*config.OrderDuration)
 	log.Println("Expected order end: " + expiry.Format("15:04"))
 
 	orders, users := getOrdersFromUsers(s, dm, voters)
@@ -126,40 +138,35 @@ func getOrdersFromUsers(
 	dm *doner.DonerMan,
 	voters []*discordgo.User,
 ) (map[string][]Order, map[string]*discordgo.User) {
-	orderChan := make(chan (Order), 16)
+	state := orderState{
+		orders: make(map[string][]Order),
+		users:  make(map[string]*discordgo.User),
+		lock:   &sync.RWMutex{},
+	}
 
-	timer := time.NewTimer(*args.OrderDuration + 5*time.Second)
-	deleteCommands := createCommands(s, timer, orderChan)
-
+	timer := time.NewTimer(*config.OrderDuration + 5*time.Second)
+	deleteCommands := createCommands(s, timer, &state)
 	defer deleteCommands()
 
-	orders := make(map[string][]Order)
-	users := make(map[string]*discordgo.User)
-	for {
-		select {
-		case order := <-orderChan:
-			orders[order.PlacedBy.ID] = append(orders[order.PlacedBy.ID], order)
-			users[order.PlacedBy.ID] = order.PlacedBy
-
-		case <-timer.C:
-			log.Println("Finished order.")
-			return orders, users
-		}
-	}
+	<-timer.C
+	log.Println("Finished order.")
+	return state.orders, state.users
 
 }
 
 // Creates slash commands and handler.
 // Returns a function which deletes the handler and commands it created.
-// TODO: confirmation messages
 func createCommands(
 	s *discordgo.Session,
 	orderTimer *time.Timer,
-	orderChan chan Order,
+	state *orderState,
 ) func() {
 	removeHandler := s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		options := i.ApplicationCommandData().Options
-		optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption, len(options))
+		optionMap := make(
+			map[string]*discordgo.ApplicationCommandInteractionDataOption,
+			len(options),
+		)
 		for _, opt := range options {
 			optionMap[opt.Name] = opt
 		}
@@ -167,7 +174,16 @@ func createCommands(
 		switch i.ApplicationCommandData().Name {
 		case "advance-order":
 			orderTimer.Reset(0)
+			if utils.IsOberdirektor(i.Member) {
+				utils.SendConfirmation(s, i)
+			} else {
+				utils.SendNotAllowed(s, i)
+			}
 		case "set-order-time":
+			if !utils.IsOberdirektor(i.Member) {
+				utils.SendNotAllowed(s, i)
+				return
+			}
 			var minutes time.Duration
 			if m, ok := optionMap["minutes"]; ok {
 				minutes = time.Duration(m.IntValue())
@@ -177,16 +193,30 @@ func createCommands(
 				seconds = time.Duration(s.IntValue())
 			}
 
-			orderTimer.Reset(time.Duration(minutes)*time.Minute + time.Duration(seconds)*time.Second)
+			duration := time.Duration(minutes)*time.Minute + time.Duration(seconds)*time.Second
+			timeEnd := time.Now().Add(duration)
 
-		case "oder":
-			handleOrderMessage(s, i, optionMap, orderChan)
+			orderTimer.Reset(duration)
+			log.Println("Order now ends: " + duration.String())
+
+			err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Bestellung endet nun um: " + timeEnd.Format("15:04"),
+				},
+			})
+			if err != nil {
+				log.Println("Could not send confirmation message" + err.Error())
+			}
+
+		case "order":
+			handleOrderMessage(s, i, optionMap, state)
 		}
 	})
 
 	cmds := []*discordgo.ApplicationCommand{}
 	for _, command := range commands {
-		cmd, err := s.ApplicationCommandCreate(*args.AppID, *args.GuildID, command)
+		cmd, err := s.ApplicationCommandCreate(*config.AppID, *config.GuildID, command)
 		if err != nil {
 			log.Fatalln("Could not create order commands: " + err.Error())
 		}
@@ -195,7 +225,7 @@ func createCommands(
 
 	return func() {
 		for _, cmd := range cmds {
-			err := s.ApplicationCommandDelete(*args.AppID, *args.GuildID, cmd.ID)
+			err := s.ApplicationCommandDelete(*config.AppID, *config.GuildID, cmd.ID)
 			if err != nil {
 				log.Println("Could not remove order commands: " + err.Error())
 			}
@@ -208,7 +238,7 @@ func handleOrderMessage(
 	s *discordgo.Session,
 	i *discordgo.InteractionCreate,
 	optionMap map[string]*discordgo.ApplicationCommandInteractionDataOption,
-	orderChan chan Order,
+	state *orderState,
 ) {
 	itemName, ok := optionMap["item-name"]
 	if !ok {
@@ -220,7 +250,7 @@ func handleOrderMessage(
 		log.Println("Not all options were provided")
 		return
 	}
-	payViaPaypal, ok := optionMap["cash-or-paypal"]
+	payMethod, ok := optionMap["payment-method"]
 	if !ok {
 		log.Println("Not all options were provided")
 		return
@@ -232,23 +262,56 @@ func handleOrderMessage(
 		amount = int(amountOpt.IntValue())
 	}
 
-	orderChan <- Order{
+	state.addUserAndOrder(i.Member.User, Order{
 		ItemName:      itemName.StringValue(),
 		PricePerPiece: itemPrice.FloatValue(),
 		Amount:        amount,
 		PlacedBy:      i.Member.User,
-		PaymentMethod: PaymentMethod(payViaPaypal.IntValue()),
-	}
+		PaymentMethod: PaymentMethod(payMethod.IntValue()),
+	})
 
 	log.Printf("Received order: %s by %s (%.02f)",
 		itemName.StringValue(), i.Member.User.Username, itemPrice.FloatValue(),
 	)
 
+	orders := state.getUserOrders(i.Member.User.ID)
+
+	fields := []*discordgo.MessageEmbedField{}
+	sum := 0.0
+	for i := range orders {
+		order := orders[i]
+		f := discordgo.MessageEmbedField{
+			Name: fmt.Sprintf(
+				"%d x %s€",
+				order.Amount,
+				order.ItemName,
+			),
+			Value: fmt.Sprintf("%d x %.02f€ = %.02f€",
+				order.Amount,
+				order.PricePerPiece,
+				order.TotalPrice(),
+			),
+			Inline: true,
+		}
+		fields = append(fields, &f)
+		sum += order.TotalPrice()
+	}
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Insgesamt:",
+		Value:  fmt.Sprintf("%.02f€", sum),
+		Inline: false,
+	})
+	embed := discordgo.MessageEmbed{
+		Type:   discordgo.EmbedTypeRich,
+		Title:  "Deine derzeitige Bestellungen",
+		Fields: fields,
+	}
+
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: "Bestellung erfolgreich!",
-			Title:   "Döner",
+			Embeds:  []*discordgo.MessageEmbed{&embed},
 		},
 	})
 }
