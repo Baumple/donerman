@@ -71,7 +71,7 @@ func sendPollMessage(s *discordgo.Session, dms []*doner.DonerMan) *discordgo.Mes
 ## Jetzt wird freiheitlich **DEMOKRATISCH** gewählt!!! (Ende %s Uhr)
 <@&%s>`, endTime, config.DonerManRole),
 		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Roles: []string{/* config.DonerManRole */},
+			Roles: []string{config.DonerManRole},
 		},
 		Poll: &discordgo.Poll{
 			Question: discordgo.PollMedia{

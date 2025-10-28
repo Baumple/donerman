@@ -1,8 +1,6 @@
 {
-    "config" : {
-        "donerman_role" : "1371736220748611636",
-        "oberdirektor_role" : "1420319070997446668"
-    },
+    "donerman_role" : "1371736220748611636",
+    "oberdirektor_role" : "1420319070997446668",
 
     "donermen": [
         {

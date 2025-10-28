@@ -35,15 +35,16 @@ const (
 )
 
 func (p PaymentMethod) String() string {
-	if p == paymentCash {
-		return "Paypal"
-	} else if p == paymentPaypal {
+	switch p {
+	case paymentCash:
 		return "Cash"
-	} else if p == paymentDebt {
+	case paymentPaypal:
+		return "Paypal"
+	case paymentDebt:
 		return "Debt"
 	}
 	log.Fatalf("Received illegal payment method: %d", p)
-	panic(nil)
+	panic("")
 }
 
 var (
