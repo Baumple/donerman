@@ -47,7 +47,9 @@ func (p PaymentMethod) String() string {
 }
 
 var (
-	minPrice  = 0.01
+	minEuro   = 0.0
+	minCents  = 0.0
+	maxCents  = 99.0
 	minAmount = 1.0
 
 	commands = []*discordgo.ApplicationCommand{
@@ -62,11 +64,19 @@ var (
 					Required:    true,
 				},
 				{
-					Type:        discordgo.ApplicationCommandOptionNumber,
-					Name:        "item-price",
-					Description: "Preis pro Stück (Euro)",
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "item-price-euro",
+					Description: "Preis (Euro)",
 					Required:    true,
-					MinValue:    &minPrice,
+					MinValue:    &minEuro,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "item-price-cent",
+					Description: "Preis (cent)",
+					Required:    true,
+					MaxValue:    maxCents,
+					MinValue:    &minCents,
 				},
 				{
 					Type:        discordgo.ApplicationCommandOptionInteger,
@@ -245,7 +255,12 @@ func handleOrderMessage(
 		log.Println("Not all options were provided")
 		return
 	}
-	itemPrice, ok := optionMap["item-price"]
+	itemPriceEuro, ok := optionMap["item-price-euro"]
+	if !ok {
+		log.Println("Not all options were provided")
+		return
+	}
+	itemPriceCents, ok := optionMap["item-price-cent"]
 	if !ok {
 		log.Println("Not all options were provided")
 		return
@@ -262,16 +277,18 @@ func handleOrderMessage(
 		amount = int(amountOpt.IntValue())
 	}
 
+	price := float64(itemPriceEuro.IntValue()) +
+		(float64(itemPriceCents.IntValue()) / 100.0)
 	state.addUserAndOrder(i.Member.User, Order{
 		ItemName:      itemName.StringValue(),
-		PricePerPiece: itemPrice.FloatValue(),
+		PricePerPiece: price,
 		Amount:        amount,
 		PlacedBy:      i.Member.User,
 		PaymentMethod: PaymentMethod(payMethod.IntValue()),
 	})
 
 	log.Printf("Received order: %s by %s (%.02f)",
-		itemName.StringValue(), i.Member.User.Username, itemPrice.FloatValue(),
+		itemName.StringValue(), i.Member.User.Username, price,
 	)
 
 	orders := state.getUserOrders(i.Member.User.ID)

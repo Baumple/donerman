@@ -3,7 +3,6 @@ package poll
 import (
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/baumple/donerman/config"
@@ -15,25 +14,21 @@ func sendInvalidVoteMessage(s *discordgo.Session) {
 	_, err := s.ChannelMessageSendComplex(
 		*config.DonerChannel,
 		&discordgo.MessageSend{
-			Content: fmt.Sprintf("Niemand hat gevoted. Heute gibt es wohl kein %s D<@&:%s>",
-				doner.GetRandomDonerName(), config.DonerManRole,
+			Content: fmt.Sprintf("Niemand hat gevoted. Heute gibt es wohl kein %s @here",
+				doner.GetRandomDonerName(),
 			),
-			AllowedMentions: &discordgo.MessageAllowedMentions{
-				Roles: []string{config.DonerManRole},
-			},
 		},
 	)
 	if err != nil {
 		log.Fatalln("Could not send invalid vote message: " + err.Error())
 	}
-	os.Exit(1)
 }
 
 func announcePollWinner(s *discordgo.Session, dm *doner.DonerMan, expiry time.Time) {
 	var content = fmt.Sprintf(
 		`## :rotating_light::rotating_light: Bestellwunschaufnahme!!! :rotating_light::rotating_light:
 ## Gewinner ist %s %s !!!!
-<@&%s>
+@here
 
 Weiteres wird per slash-command geklärt ("/order") :saluting_face:!
 
@@ -41,7 +36,6 @@ Weiteres wird per slash-command geklärt ("/order") :saluting_face:!
 Danach wird **nichts** mehr angenommen.`,
 		dm.Name,
 		dm.Emoji,
-		config.DonerManRole,
 		expiry.Format("15:04"),
 	)
 	_, err := s.ChannelMessageSendComplex(*config.DonerChannel, &discordgo.MessageSend{
@@ -69,10 +63,7 @@ func sendPollMessage(s *discordgo.Session, dms []*doner.DonerMan) *discordgo.Mes
 	pollMsg, err := s.ChannelMessageSendComplex(*config.DonerChannel, &discordgo.MessageSend{
 		Content: fmt.Sprintf(`# 🚨🚨 Welcher Dönermann wird heute beansprucht. 🚨🚨
 ## Jetzt wird freiheitlich **DEMOKRATISCH** gewählt!!! (Ende %s Uhr)
-<@&%s>`, endTime, config.DonerManRole),
-		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Roles: []string{/* config.DonerManRole */},
-		},
+@here`, endTime),
 		Poll: &discordgo.Poll{
 			Question: discordgo.PollMedia{
 				Text: fmt.Sprintf("Wähle deinen %s-Fabrikanten des Vertrauens!!!",
