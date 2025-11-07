@@ -52,12 +52,8 @@ func sendOrderSummary(
 	}
 
 	_, err := s.ChannelMessageSendComplex(*config.DonerChannel, &discordgo.MessageSend{
-		Content: "# :rotating_light: Die Bestellungen sind nun da! :rotating_light:",
+		Content: "# :rotating_light: Die Bestellungen sind nun da! :rotating_light: @here",
 		Embeds:  orderSummaryEmbeds,
-		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Roles: []string{config.DonerManRole},
-			Users: userIds,
-		},
 	})
 
 	if err != nil {
