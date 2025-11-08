@@ -1,16 +1,17 @@
-package order
+package ordering
 
 import (
 	"fmt"
 	"log"
 
 	"github.com/baumple/donerman/config"
+	"github.com/baumple/donerman/ordering/order"
 	"github.com/bwmarrin/discordgo"
 )
 
 func sendOrderSummary(
 	s *discordgo.Session,
-	userOrdersMap map[string][]Order,
+	userOrdersMap map[string][]order.Order,
 	users map[string]*discordgo.User,
 ) {
 	orderSummaryEmbeds := []*discordgo.MessageEmbed{}
