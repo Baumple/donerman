@@ -5,7 +5,7 @@ import (
 
 	"github.com/baumple/donerman/config"
 	"github.com/baumple/donerman/doner"
-	"github.com/baumple/donerman/order"
+	"github.com/baumple/donerman/ordering"
 	"github.com/baumple/donerman/poll"
 
 	"github.com/bwmarrin/discordgo"
@@ -36,6 +36,6 @@ func main() {
 	defer s.Close()
 
 	dm, voters := poll.StartDonerMenPoll(s, dms)
-	order.StartOrder(s, dm, voters)
+	ordering.StartOrder(s, dm, voters)
 
 }
