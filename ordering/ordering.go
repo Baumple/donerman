@@ -148,17 +148,20 @@ var (
 		},
 	}
 
-	removeOrderHandler = func(
+	handleRemoveOrder = func(
 		s *discordgo.Session,
 		i *discordgo.InteractionCreate,
 		state *orderstate.OrderState,
 	) {
 		orderID := i.MessageComponentData().CustomID
-		state.RemoveOrder(i.Member.User.ID, orderID)
+		c := "Entfernt!"
+		if !state.RemoveOrder(i.Member.User.ID, orderID) {
+			c = "Die Bestellung existiert nicht/nicht mehr."
+		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "Entfernt!",
+				Content: c,
 			},
 		})
 	}
@@ -211,7 +214,7 @@ func createCommands(
 			}
 
 		case discordgo.InteractionMessageComponent:
-			removeOrderHandler(s, i, state)
+			handleRemoveOrder(s, i, state)
 		}
 
 	})
@@ -234,6 +237,7 @@ func createCommands(
 		}
 		removeHandler()
 	}
+
 }
 
 func createOrderContainer(orders []order.Order) []discordgo.MessageComponent {

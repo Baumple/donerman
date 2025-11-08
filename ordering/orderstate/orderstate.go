@@ -33,20 +33,24 @@ func (o *OrderState) ResetOrders(userID string) {
 	o.orders[userID] = []order.Order{}
 }
 
-func (o *OrderState) RemoveOrder(userID string, orderID string) {
+func (o *OrderState) RemoveOrder(userID string, orderID string) bool {
 	o.lock.Lock()
 	defer o.lock.Unlock()
 
 	currentOrders := o.orders[userID]
 	newOrders := []order.Order{}
 
+	found := false
 	for i := range currentOrders {
 		if currentOrders[i].ID != uuid.MustParse(orderID) {
 			newOrders = append(newOrders, currentOrders[i])
+		} else {
+			found = true
 		}
 	}
 
 	o.orders[userID] = newOrders
+	return found
 }
 
 func (o *OrderState) GetUserOrders(id string) []order.Order {
