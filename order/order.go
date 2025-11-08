@@ -138,7 +138,7 @@ func StartOrder(s *discordgo.Session, dm *doner.DonerMan, voters []*discordgo.Us
 	expiry := time.Now().Local().Add(*config.OrderDuration)
 	log.Println("Expected order end: " + expiry.Format("15:04"))
 
-	orders, users := getOrdersFromUsers(s, dm, voters)
+	orders, users := getOrdersFromUsers(s)
 	sendOrderSummary(s, orders, users)
 
 	return orders
@@ -146,8 +146,6 @@ func StartOrder(s *discordgo.Session, dm *doner.DonerMan, voters []*discordgo.Us
 
 func getOrdersFromUsers(
 	s *discordgo.Session,
-	dm *doner.DonerMan,
-	voters []*discordgo.User,
 ) (map[string][]Order, map[string]*discordgo.User) {
 	state := orderState{
 		orders: make(map[string][]Order),
@@ -208,7 +206,7 @@ func createCommands(
 			timeEnd := time.Now().Add(duration)
 
 			orderTimer.Reset(duration)
-			log.Println("Order now ends: " + duration.String())
+			log.Println("Order now ends: " + timeEnd.Format("15:04"))
 
 			err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
